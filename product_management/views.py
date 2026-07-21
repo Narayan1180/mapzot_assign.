@@ -63,40 +63,157 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 class BulkUploadView(APIView):
     parser_classes = [MultiPartParser]
-    permission_classes = [ProductPermission]  # only editors/managers can upload
+    permission_classes = [ProductPermission]
 
     def post(self, request):
-        #file = request.FILES['file']
+
         file = request.FILES.get("file")
+
         if not file:
-            return Response({"error": "No file uploaded"},status=400)
-        df = pd.read_excel(file)
-        # Expected columns: Product Name, Product price, discount price, Product fabric type, Colour, sizes, product description
-        # Note: 'sizes' might be a comma-separated list? For simplicity, we'll assume each row is a variant.
-        # Better to group by product name and colour to create variants.
-        # Implementation details...
-        for _, row in df.iterrows():
-            # Create or get Product
-            product, _ = Product.objects.get_or_create(
-                name=row['Product Name'],
-                defaults={
-                    'description': row.get('product description', ''),
-                    'fabric_type': row['Product fabric type'],
-                    'base_price': row['Product price'],
-                    'discount_price': row.get('discount price', None),
-                }
+            return Response(
+                {"error": "No file uploaded"},
+                status=400
             )
-            # Create variant for each colour and size
-            colours = row['Colour'].split(',')  # if multiple colours in one cell?
-            sizes = row['sizes'].split(',')
+
+        df = pd.read_excel(file)
+
+        products_to_create = []
+        variants_to_create = []
+
+        # Get existing products
+        product_names = df['Product Name'].unique()
+
+        existing_products = {
+            product.name: product
+            for product in Product.objects.filter(
+                name__in=product_names
+            )
+        }
+        print(existing_products)
+
+        # -----------------------------
+        # Create Products
+        # -----------------------------
+        for _, row in df.iterrows():
+            print(row)
+
+            product_name = row['Product Name']
+
+            if product_name not in existing_products:
+
+                product = Product(
+                    name=product_name,
+                    description=row.get(
+                        'product description',
+                        ''
+                    ),
+                    fabric_type=row['Product fabric type'],
+                    base_price=row['Product price'],
+                    discount_price=row.get(
+                        'discount price',
+                        None
+                    ),
+                    is_published=True
+                )
+
+                products_to_create.append(product)
+
+
+        # Bulk create products
+        if products_to_create:
+
+            Product.objects.bulk_create(
+                products_to_create
+            )
+
+            # Get newly created products with IDs
+            new_products = Product.objects.filter(
+                name__in=[
+                    p.name for p in products_to_create
+                ]
+            )
+
+            for product in new_products:
+                existing_products[product.name] = product #updating existing product
+
+
+
+        # -----------------------------
+        # Create Variants (Optional)
+        # -----------------------------
+        existing_variants = set(
+            ProductVariant.objects.values_list(
+                'product_id',
+                'colour',
+                'size'
+            )
+        )
+
+
+        for _, row in df.iterrows():
+
+            product = existing_products[
+                row['Product Name']
+            ]
+
+            colour_value = row.get('Colour')
+            size_value = row.get('sizes')
+
+
+            # Skip variant creation
+            # if colour or size is missing
+            if pd.isna(colour_value) or pd.isna(size_value):
+                continue
+
+
+            colours = str(colour_value).split(',')
+            sizes = str(size_value).split(',')
+
+
             for colour in colours:
+
                 for size in sizes:
-                    ProductVariant.objects.get_or_create(
-                        product=product,
-                        colour=colour.strip(),
-                        size=size.strip(),
-                        price=row['Product price'],
-                        discount_price=row.get('discount price', None)
+
+                    colour = colour.strip()
+                    size = size.strip()
+
+
+                    variant_key = (
+                        product.id,
+                        colour,
+                        size
                     )
-        return Response({'message': 'Upload successful'})
-    
+
+
+                    if variant_key not in existing_variants:
+
+                        variants_to_create.append(
+                            ProductVariant(
+                                product=product,
+                                colour=colour,
+                                size=size,
+                                price=row['Product price'],
+                                discount_price=row.get(
+                                    'discount price',
+                                    None
+                                )
+                            )
+                        )
+
+
+        # Bulk create variants
+        if variants_to_create:
+
+            ProductVariant.objects.bulk_create(
+                variants_to_create,
+                batch_size=1000
+            )
+
+
+        return Response(
+            {
+                "message": "Upload successful",
+                "products_created": len(products_to_create),
+                "variants_created": len(variants_to_create)
+            }
+        )
