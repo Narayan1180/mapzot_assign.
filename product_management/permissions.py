@@ -11,7 +11,7 @@ class ProductPermission(BasePermission):
             return False
 
         role = request.user.role
-        print(role)
+        print(role,request)
         # Type 1 -> Read, Update, Delete
         if role == "type1":
             return request.method in ["GET", "PUT", "PATCH", "DELETE"]
@@ -25,3 +25,11 @@ class ProductPermission(BasePermission):
             return request.method in ["GET", "POST"]
 
         return False
+
+class PublishPermission(BasePermission):
+
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role == "type1"
+        )

@@ -129,6 +129,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "account.authentication.CookieJWTAuthentication",
     ),
+    'DEFAULT_PAGINATION_CLASS': 
+        'rest_framework.pagination.PageNumberPagination',
+
+    # Number of records per page
+    'PAGE_SIZE': 10,
+
 }
 from datetime import timedelta
 

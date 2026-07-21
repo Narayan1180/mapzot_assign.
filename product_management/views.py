@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Product
 from .serializers import ProductSerializer
-from .permissions import ProductPermission
+from .permissions import ProductPermission,PublishPermission
 from rest_framework import status
 
 
@@ -16,23 +16,19 @@ import pandas as pd
 from .models import Product, ProductVariant
 
 
-from rest_framework.permissions import BasePermission
-
-
-class PublishPermission(BasePermission):
-
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated
-            and request.user.role == "type1"
-        )
-
-
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [ProductPermission]
+
+    def get_permissions(self):
+        if self.action in ["publish", "unpublish"]:
+            permission_classes = [PublishPermission]
+        else:
+            permission_classes = [ProductPermission]
+
+        return [permission() for permission in permission_classes]
 
 
     @action(detail=True, methods=["patch"])
@@ -95,7 +91,7 @@ class BulkUploadView(APIView):
         # Create Products
         # -----------------------------
         for _, row in df.iterrows():
-            print(row)
+            #print(row)
 
             product_name = row['Product Name']
 

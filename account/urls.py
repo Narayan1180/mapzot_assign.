@@ -17,12 +17,13 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
-from .views import signup,LoginAPIView,VerifyOTPAPIView
+from .views import signup,LoginAPIView,VerifyOTPAPIView,LogoutView
 
 urlpatterns = [
-    
+
     path("signup/",signup,name="signup"),
     path("login/", LoginAPIView.as_view(), name="login"),
     path("verify-otp/", VerifyOTPAPIView.as_view(), name="verify-otp"),
+    path("logout/",LogoutView.as_view(),name="logout")
 
 ]

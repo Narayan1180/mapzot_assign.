@@ -1,7 +1,13 @@
 from django.shortcuts import render, redirect
 from django.db import models
 from django.http import HttpResponse
-from django.contrib.auth import get_user_model
+
+from django.contrib.auth import authenticate, get_user_model
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import AllowAny
 
 User = get_user_model()
 
@@ -28,15 +34,6 @@ def signup(request):
 
 
 # views.py
-
-from django.contrib.auth import authenticate, get_user_model
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import AllowAny
-
-User = get_user_model()
 
 
 class LoginAPIView(APIView):
@@ -140,3 +137,16 @@ class VerifyOTPAPIView(APIView):
 
         return response
 
+class LogoutView(APIView):
+
+    def post(self, request):
+
+        response = Response(
+            {"message": "Logged out successfully"},
+            status=status.HTTP_200_OK
+        )
+
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+
+        return response
